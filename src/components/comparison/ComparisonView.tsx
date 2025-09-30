@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { GitCompare } from 'lucide-react';
 import type { Product, InventoryData, ComparisonData, UserSession, CountingGroup } from '../../types';
 import { formatNumber } from '../../utils/helpers';
-import { NumericKeyboard } from '../common/NumericKeyboard';
 
 interface ComparisonViewProps {
   products: Product[];
@@ -20,7 +19,6 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
   comparisonData,
   userSession,
   groups,
-  onResolveDiscrepancy,
   onBackToUser
 }) => {
   const group = groups.find(g => g.id === userSession.groupId);
@@ -39,48 +37,31 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
     return { person1Data, person2Data, resolved, finalQuantity };
   };
 
-  const discrepancies = groupProducts.filter(product => {
-    const { person1Data, person2Data, resolved } = getProductComparison(product.id);
-    return person1Data !== undefined && person2Data !== undefined && 
-           person1Data !== person2Data && !resolved;
+  // Tylko produkty gdzie obie osoby policzyły
+  const comparedProducts = groupProducts.filter(product => {
+    const { person1Data, person2Data } = getProductComparison(product.id);
+    return person1Data !== undefined && person2Data !== undefined;
   });
 
-  const resolvedDiscrepancies = groupProducts.filter(product => {
+  const discrepancies = comparedProducts.filter(product => {
+    const { person1Data, person2Data, resolved } = getProductComparison(product.id);
+    return person1Data !== person2Data && !resolved;
+  });
+
+  const agreements = comparedProducts.filter(product => {
+    const { person1Data, person2Data, resolved } = getProductComparison(product.id);
+    return person1Data === person2Data && !resolved;
+  });
+
+  const resolvedDiscrepancies = comparedProducts.filter(product => {
     const { resolved } = getProductComparison(product.id);
     return resolved;
   });
 
-  const agreements = groupProducts.filter(product => {
-    const { person1Data, person2Data, resolved } = getProductComparison(product.id);
-    return person1Data !== undefined && person2Data !== undefined && 
-           person1Data === person2Data && !resolved;
+  const notYetCounted = groupProducts.filter(product => {
+    const { person1Data, person2Data } = getProductComparison(product.id);
+    return person1Data === undefined || person2Data === undefined;
   });
-
-  const [selectedDiscrepancy, setSelectedDiscrepancy] = useState<number | null>(null);
-  const [correctionValue, setCorrectionValue] = useState<string>('');
-
-  const handleCorrection = () => {
-    if (selectedDiscrepancy && correctionValue !== '') {
-      const quantity = parseInt(correctionValue);
-      if (!isNaN(quantity) && quantity >= 0) {
-        onResolveDiscrepancy(selectedDiscrepancy, quantity);
-        setSelectedDiscrepancy(null);
-        setCorrectionValue('');
-      }
-    }
-  };
-
-  const handleNumberClick = (num: string): void => {
-    setCorrectionValue(correctionValue + num);
-  };
-
-  const handleBackspace = (): void => {
-    setCorrectionValue(correctionValue.slice(0, -1));
-  };
-
-  const handleClear = (): void => {
-    setCorrectionValue('');
-  };
 
   return (
     <div className="space-y-6">
@@ -98,29 +79,85 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
           </button>
         </div>
         
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-4 gap-4 mb-6">
           <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-            <h3 className="font-semibold text-red-700 mb-2">Różnice do rozwiązania</h3>
+            <h3 className="font-semibold text-red-700 mb-2">Różnice</h3>
             <div className="text-2xl font-bold text-red-600">{discrepancies.length}</div>
+            <div className="text-xs text-gray-600 mt-1">wymaga rozwiązania</div>
           </div>
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <h3 className="font-semibold text-green-700 mb-2">Zgodne wyniki</h3>
+            <h3 className="font-semibold text-green-700 mb-2">Zgodne</h3>
             <div className="text-2xl font-bold text-green-600">{agreements.length}</div>
+            <div className="text-xs text-gray-600 mt-1">identyczne wyniki</div>
           </div>
           <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h3 className="font-semibold text-blue-700 mb-2">Rozwiązane różnice</h3>
+            <h3 className="font-semibold text-blue-700 mb-2">Rozwiązane</h3>
             <div className="text-2xl font-bold text-blue-600">{resolvedDiscrepancies.length}</div>
+            <div className="text-xs text-gray-600 mt-1">po korekcie</div>
           </div>
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <h3 className="font-semibold text-gray-700 mb-2">Brak danych</h3>
+            <div className="text-2xl font-bold text-gray-600">{notYetCounted.length}</div>
+            <div className="text-xs text-gray-600 mt-1">nie policzone przez obie osoby</div>
+          </div>
+        </div>
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-sm text-yellow-800">
+            <strong>Instrukcja:</strong> Jeśli zauważysz różnicę w swoich wynikach z drugim liczącym, 
+            wróć do ekranu liczenia i zweryfikuj swoje wpisy w historii. Każda osoba edytuje tylko swoje dane.
+          </p>
         </div>
       </div>
 
+      {notYetCounted.length > 0 && (
+        <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
+          <h3 className="text-lg font-bold text-gray-700 mb-4">
+            ⏳ Oczekiwanie na dane ({notYetCounted.length})
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Następujące produkty nie zostały jeszcze policzone przez obie osoby:
+          </p>
+          <div className="grid gap-3">
+            {notYetCounted.map(product => {
+              const { person1Data, person2Data } = getProductComparison(product.id);
+              
+              return (
+                <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-300 rounded-lg">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{product.name}</h4>
+                    <p className="text-sm text-gray-600">SAP: {product.sapCode}</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500">{group.person1}</div>
+                      <div className={`font-bold ${person1Data !== undefined ? 'text-green-600' : 'text-gray-400'}`}>
+                        {person1Data !== undefined ? formatNumber(person1Data) : '—'}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500">{group.person2}</div>
+                      <div className={`font-bold ${person2Data !== undefined ? 'text-purple-600' : 'text-gray-400'}`}>
+                        {person2Data !== undefined ? formatNumber(person2Data) : '—'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {discrepancies.length > 0 && (
         <div className="bg-white rounded-lg shadow-lg p-6 border border-red-200">
-          <h3 className="text-lg font-bold text-red-700 mb-4">Różnice wymagające korekty</h3>
+          <h3 className="text-lg font-bold text-red-700 mb-4">⚠️ Różnice wymagające weryfikacji</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Wróć do ekranu liczenia i sprawdź swoje wpisy w historii. Każda osoba weryfikuje i edytuje tylko swoje dane.
+          </p>
           <div className="space-y-4">
             {discrepancies.map(product => {
               const { person1Data, person2Data } = getProductComparison(product.id);
-              const isSelected = selectedDiscrepancy === product.id;
               
               return (
                 <div key={product.id} className="border border-red-300 rounded-lg p-4 bg-red-50">
@@ -129,59 +166,24 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
                       <h4 className="font-semibold text-gray-900">{product.name}</h4>
                       <p className="text-sm text-gray-600">SAP: {product.sapCode}</p>
                     </div>
-                    <button
-                      onClick={() => {
-                        setSelectedDiscrepancy(isSelected ? null : product.id);
-                        setCorrectionValue('');
-                      }}
-                      className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
-                    >
-                      {isSelected ? 'Anuluj' : 'Skoryguj'}
-                    </button>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-white p-3 rounded border">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className={`p-3 rounded border ${userSession.personId === 'person1' ? 'bg-white border-green-400 border-2' : 'bg-white'}`}>
                       <div className="text-sm text-gray-600">{group.person1}</div>
                       <div className="text-lg font-bold text-green-600">{formatNumber(person1Data || 0)}</div>
+                      {userSession.personId === 'person1' && (
+                        <div className="text-xs text-blue-600 mt-1">← Twój wynik</div>
+                      )}
                     </div>
-                    <div className="bg-white p-3 rounded border">
+                    <div className={`p-3 rounded border ${userSession.personId === 'person2' ? 'bg-white border-purple-400 border-2' : 'bg-white'}`}>
                       <div className="text-sm text-gray-600">{group.person2}</div>
                       <div className="text-lg font-bold text-purple-600">{formatNumber(person2Data || 0)}</div>
+                      {userSession.personId === 'person2' && (
+                        <div className="text-xs text-blue-600 mt-1">← Twój wynik</div>
+                      )}
                     </div>
                   </div>
-                  
-                  {isSelected && (
-                    <div className="bg-white p-4 rounded-lg border-2 border-blue-300">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Wprowadź poprawną ilość:
-                      </label>
-                      <input
-                        type="text"
-                        value={correctionValue}
-                        readOnly
-                        className="w-full px-4 py-3 text-xl text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 mb-4"
-                        placeholder="0"
-                      />
-                      
-                      <div className="mb-4">
-                        <NumericKeyboard
-                          onNumberClick={handleNumberClick}
-                          onBackspace={handleBackspace}
-                          onClear={handleClear}
-                          size="normal"
-                        />
-                      </div>
-                      
-                      <button
-                        onClick={handleCorrection}
-                        disabled={correctionValue === ''}
-                        className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-semibold"
-                      >
-                        Zatwierdź korektę
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -191,7 +193,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
 
       {agreements.length > 0 && (
         <div className="bg-white rounded-lg shadow-lg p-6 border border-green-200">
-          <h3 className="text-lg font-bold text-green-700 mb-4">Zgodne wyniki</h3>
+          <h3 className="text-lg font-bold text-green-700 mb-4">✓ Zgodne wyniki</h3>
           <div className="grid gap-3">
             {agreements.map(product => {
               const { person1Data } = getProductComparison(product.id);
@@ -215,7 +217,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
 
       {resolvedDiscrepancies.length > 0 && (
         <div className="bg-white rounded-lg shadow-lg p-6 border border-blue-200">
-          <h3 className="text-lg font-bold text-blue-700 mb-4">Rozwiązane różnice</h3>
+          <h3 className="text-lg font-bold text-blue-700 mb-4">✓ Rozwiązane różnice</h3>
           <div className="grid gap-3">
             {resolvedDiscrepancies.map(product => {
               const { finalQuantity } = getProductComparison(product.id);
@@ -228,7 +230,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
                   </div>
                   <div className="bg-white px-3 py-2 rounded border border-blue-300">
                     <div className="text-lg font-bold text-blue-600">{formatNumber(finalQuantity || 0)}</div>
-                    <div className="text-xs text-gray-500">skorygowane</div>
+                    <div className="text-xs text-gray-500">po weryfikacji</div>
                   </div>
                 </div>
               );

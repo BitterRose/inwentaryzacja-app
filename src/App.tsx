@@ -382,10 +382,17 @@ const App: React.FC = () => {
     });
   };
 
-  const getProductStatus = (product: Product): ProductStatus => {
+const getProductStatus = (product: Product): ProductStatus => {
     if (!userSession) return 'pending';
     
     const currentUserData = inventoryData[userSession.groupId]?.[userSession.personId]?.[product.id];
+    
+    // W widoku zwykłego użytkownika - pokazuj tylko czy policzył, czy nie
+    if (currentView === 'user') {
+      return currentUserData !== undefined ? 'counted' : 'pending';
+    }
+    
+    // W widoku porównania lub admina - pokazuj pełny status
     const otherPersonId = userSession.personId === 'person1' ? 'person2' : 'person1';
     const otherUserData = inventoryData[userSession.groupId]?.[otherPersonId]?.[product.id];
     
@@ -402,8 +409,10 @@ const App: React.FC = () => {
       }
     }
     
-    if (otherUserData !== undefined && currentUserData !== otherUserData) {
-      return 'person_diff';
+    if (currentView === 'comparison') {
+      if (otherUserData !== undefined) {
+        return currentUserData === otherUserData ? 'match' : 'person_diff';
+      }
     }
     
     return 'counted';

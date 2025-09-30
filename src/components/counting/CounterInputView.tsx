@@ -18,12 +18,16 @@ interface CounterInputViewProps {
   deleteHistoryEntry: (productId: number, entryId: number) => void;
   quantityInputRef: React.RefObject<HTMLInputElement | null>;
   userSession: UserSession;
+  fromComparison?: boolean; // NOWE
+  onBackToComparison?: () => void; // NOWE
 }
 
 export const CounterInputView: React.FC<CounterInputViewProps> = ({ 
   selectedProduct, setSelectedProduct, inputValue, setInputValue, inventoryData, 
   inventoryHistory, handleQuantitySubmit, handleKeyPress, updateHistoryEntry, 
-  deleteHistoryEntry, quantityInputRef, userSession 
+  deleteHistoryEntry, quantityInputRef, userSession,
+  fromComparison = false, // NOWE
+  onBackToComparison // NOWE
 }) => {
   const currentUserData = inventoryData[userSession.groupId]?.[userSession.personId]?.[selectedProduct.id];
   const currentUserHistory = inventoryHistory[userSession.groupId]?.[userSession.personId]?.[selectedProduct.id];
@@ -43,13 +47,23 @@ export const CounterInputView: React.FC<CounterInputViewProps> = ({
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
       <div className="mb-6">
-        <button
-          onClick={() => setSelectedProduct(null)}
-          className="w-full mb-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 transition-all flex items-center justify-center gap-2 border-2 border-blue-300 shadow-md"
-        >
-          <span className="text-lg">←</span>
-          Powrót do wyszukiwania
-        </button>
+        {fromComparison && onBackToComparison ? (
+          <button
+            onClick={onBackToComparison}
+            className="w-full mb-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-orange-600 hover:to-orange-700 transition-all flex items-center justify-center gap-2 border-2 border-orange-300 shadow-md"
+          >
+            <span className="text-lg">←</span>
+            Powrót do porównania
+          </button>
+        ) : (
+          <button
+            onClick={() => setSelectedProduct(null)}
+            className="w-full mb-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 transition-all flex items-center justify-center gap-2 border-2 border-blue-300 shadow-md"
+          >
+            <span className="text-lg">←</span>
+            Powrót do wyszukiwania
+          </button>
+        )}
         
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-lg mb-6 border border-blue-200">
           <div className="flex items-center gap-3 mb-2">

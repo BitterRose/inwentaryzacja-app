@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Package } from 'lucide-react';
-import type { 
-  Product, 
-  UserSession, 
-  InventoryData, 
-  InventoryHistory, 
-  ComparisonData, 
+import type {
+  Product,
+  UserSession,
+  InventoryData,
+  InventoryHistory,
+  ComparisonData,
   ProductStatus,
-  CountingGroup 
+  CountingGroup
 } from './types';
 import { formatNumber } from './utils/helpers';
 import { NumericKeyboard } from './components/common/NumericKeyboard';
@@ -27,7 +27,7 @@ const App: React.FC = () => {
 
   const [products] = useState<Product[]>(() => {
     const baseProducts = defaultProducts;
-    
+
     // Assign products to groups
     return baseProducts.map(product => ({
       ...product,
@@ -47,17 +47,18 @@ const App: React.FC = () => {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [inputValue, setInputValue] = useState<string>('');
-  
+  const [fromComparison, setFromComparison] = useState<boolean>(false);
+
   const [inventoryData, setInventoryData] = useState<InventoryData>(() => {
     const saved = localStorage.getItem('inventory-data');
     return saved ? JSON.parse(saved) : {};
   });
-  
+
   const [inventoryHistory, setInventoryHistory] = useState<InventoryHistory>(() => {
     const saved = localStorage.getItem('inventory-history');
     return saved ? JSON.parse(saved) : {};
   });
-  
+
   const [comparisonData] = useState<ComparisonData>(() => {
     const saved = localStorage.getItem('inventory-comparison');
     return saved ? JSON.parse(saved) : {};
@@ -67,7 +68,7 @@ const App: React.FC = () => {
   const [pinInput, setPinInput] = useState<string>('');
   const [pinError, setPinError] = useState<boolean>(false);
   const [showFillZerosModal, setShowFillZerosModal] = useState<boolean>(false);
-  
+
   const searchInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const pinInputRef = useRef<HTMLInputElement>(null);
@@ -106,7 +107,7 @@ const App: React.FC = () => {
       return;
     }
 
-    let groupProducts = products.filter(product => 
+    let groupProducts = products.filter(product =>
       userGroup.materialGroups.includes(product.materialGroup)
     );
 
@@ -202,7 +203,7 @@ const App: React.FC = () => {
       const quantity = parseInt(inputValue);
       if (!isNaN(quantity) && quantity >= 0) {
         const timestamp = Date.now();
-        
+
         const currentUserData = inventoryData[userSession.groupId]?.[userSession.personId]?.[selectedProduct.id];
         const currentUserHistory = inventoryHistory[userSession.groupId]?.[userSession.personId]?.[selectedProduct.id];
 
@@ -221,7 +222,7 @@ const App: React.FC = () => {
               }
             }
           }));
-          
+
           setInventoryData(prev => ({
             ...prev,
             [userSession.groupId]: {
@@ -232,9 +233,9 @@ const App: React.FC = () => {
               }
             }
           }));
-          
+
           setInputValue('');
-          
+
           setTimeout(() => {
             if (quantityInputRef.current) {
               quantityInputRef.current.focus();
@@ -254,7 +255,7 @@ const App: React.FC = () => {
               }
             }
           }));
-          
+
           setInventoryData(prev => ({
             ...prev,
             [userSession.groupId]: {
@@ -265,11 +266,11 @@ const App: React.FC = () => {
               }
             }
           }));
-          
+
           setSelectedProduct(null);
           setInputValue('');
           setSearchTerm('');
-          
+
           setTimeout(() => {
             if (searchInputRef.current) {
               searchInputRef.current.focus();
@@ -292,13 +293,13 @@ const App: React.FC = () => {
 
   const updateHistoryEntry = (productId: number, entryId: number, newQuantity: number): void => {
     if (newQuantity < 0 || !userSession) return;
-    
+
     setInventoryHistory(prev => {
       const currentHistory = prev[userSession.groupId]?.[userSession.personId]?.[productId] || [];
-      const updatedHistory = currentHistory.map(entry => 
+      const updatedHistory = currentHistory.map(entry =>
         entry.id === entryId ? { ...entry, quantity: newQuantity } : entry
       );
-      
+
       const totalQuantity = updatedHistory.reduce((sum, entry) => sum + entry.quantity, 0);
       setInventoryData(prevData => ({
         ...prevData,
@@ -310,7 +311,7 @@ const App: React.FC = () => {
           }
         }
       }));
-      
+
       return {
         ...prev,
         [userSession.groupId]: {
@@ -326,16 +327,16 @@ const App: React.FC = () => {
 
   const deleteHistoryEntry = (productId: number, entryId: number): void => {
     if (!userSession) return;
-    
+
     setInventoryHistory(prev => {
       const currentHistory = prev[userSession.groupId]?.[userSession.personId]?.[productId] || [];
       const updatedHistory = currentHistory.filter(entry => entry.id !== entryId);
-      
+
       if (updatedHistory.length === 0) {
         setInventoryData(prevData => {
           const newGroupData = { ...(prevData[userSession.groupId]?.[userSession.personId] || {}) };
           delete newGroupData[productId];
-          
+
           return {
             ...prevData,
             [userSession.groupId]: {
@@ -344,7 +345,7 @@ const App: React.FC = () => {
             }
           };
         });
-        
+
         const newHistory = {
           ...prev,
           [userSession.groupId]: {
@@ -368,7 +369,7 @@ const App: React.FC = () => {
             }
           }
         }));
-        
+
         return {
           ...prev,
           [userSession.groupId]: {
@@ -385,37 +386,37 @@ const App: React.FC = () => {
 
   const getProductStatus = (product: Product): ProductStatus => {
     if (!userSession) return 'pending';
-    
+
     const currentUserData = inventoryData[userSession.groupId]?.[userSession.personId]?.[product.id];
-    
+
     // W widoku zwykłego użytkownika - pokazuj tylko czy policzył, czy nie
     if (currentView === 'user') {
       return currentUserData !== undefined ? 'counted' : 'pending';
     }
-    
+
     // W widoku porównania lub admina - pokazuj pełny status
     const otherPersonId = userSession.personId === 'person1' ? 'person2' : 'person1';
     const otherUserData = inventoryData[userSession.groupId]?.[otherPersonId]?.[product.id];
-    
+
     if (currentUserData === undefined) return 'pending';
-    
+
     if (currentView === 'admin') {
       const resolved = comparisonData[userSession.groupId]?.[product.id]?.resolved;
       const finalQuantity = comparisonData[userSession.groupId]?.[product.id]?.finalQuantity;
-      
+
       if (resolved && finalQuantity !== undefined) {
         return finalQuantity === product.expectedQty ? 'match' : 'diff';
       } else if (otherUserData !== undefined) {
         return currentUserData === otherUserData ? 'match' : 'person_diff';
       }
     }
-    
+
     if (currentView === 'comparison') {
       if (otherUserData !== undefined) {
         return currentUserData === otherUserData ? 'match' : 'person_diff';
       }
     }
-    
+
     return 'counted';
   };
 
@@ -450,25 +451,26 @@ const App: React.FC = () => {
   const handleBackToUser = (): void => {
     setCurrentView('user');
     setSelectedProduct(null);
+    setFromComparison(false); // NOWE
   };
 
   const handleFillZeros = (): void => {
     if (!userSession) return;
-    
+
     const userGroup = groups.find(g => g.id === userSession.groupId);
     if (!userGroup) return;
-    
+
     const groupProducts = products.filter(p => userGroup.materialGroups.includes(p.materialGroup));
-    const uncountedProducts = groupProducts.filter(p => 
+    const uncountedProducts = groupProducts.filter(p =>
       inventoryData[userSession.groupId]?.[userSession.personId]?.[p.id] === undefined
     );
-    
+
     const timestamp = Date.now();
-    
+
     // Wypełnij wszystkie nieuzupełnione produkty zerami
     const newInventoryData = { ...inventoryData };
     const newInventoryHistory = { ...inventoryHistory };
-    
+
     if (!newInventoryData[userSession.groupId]) {
       newInventoryData[userSession.groupId] = {};
     }
@@ -481,14 +483,14 @@ const App: React.FC = () => {
     if (!newInventoryHistory[userSession.groupId][userSession.personId]) {
       newInventoryHistory[userSession.groupId][userSession.personId] = {};
     }
-    
+
     uncountedProducts.forEach(product => {
       newInventoryData[userSession.groupId][userSession.personId][product.id] = 0;
       newInventoryHistory[userSession.groupId][userSession.personId][product.id] = [
         { id: timestamp, quantity: 0, timestamp, location: 'Auto-uzupełnienie' }
       ];
     });
-    
+
     setInventoryData(newInventoryData);
     setInventoryHistory(newInventoryHistory);
     setShowFillZerosModal(false);
@@ -501,17 +503,17 @@ const App: React.FC = () => {
 
   const handleCompareResults = (): void => {
     if (!userSession) return;
-    
+
     const userGroup = groups.find(g => g.id === userSession.groupId);
     if (!userGroup) return;
-    
+
     const groupProducts = products.filter(p => userGroup.materialGroups.includes(p.materialGroup));
-    
+
     // Sprawdź które produkty nie zostały policzone przez bieżącego użytkownika
-    const uncountedProducts = groupProducts.filter(p => 
+    const uncountedProducts = groupProducts.filter(p =>
       inventoryData[userSession.groupId]?.[userSession.personId]?.[p.id] === undefined
     );
-    
+
     if (uncountedProducts.length > 0) {
       setShowFillZerosModal(true);
     } else {
@@ -522,15 +524,15 @@ const App: React.FC = () => {
   // Calculate progress for current user's group
   const getCurrentGroupProgress = () => {
     if (!userSession) return { counted: 0, total: 0 };
-    
+
     const userGroup = groups.find(g => g.id === userSession.groupId);
     if (!userGroup) return { counted: 0, total: 0 };
-    
+
     const groupProducts = products.filter(p => userGroup.materialGroups.includes(p.materialGroup));
-    const countedProducts = groupProducts.filter(p => 
+    const countedProducts = groupProducts.filter(p =>
       inventoryData[userSession.groupId]?.[userSession.personId]?.[p.id] !== undefined
     ).length;
-    
+
     return { counted: countedProducts, total: groupProducts.length };
   };
 
@@ -544,7 +546,7 @@ const App: React.FC = () => {
         <p className="text-sm text-gray-600 mb-6 text-center">
           Wprowadź PIN aby uzyskać dostęp do panelu administratora
         </p>
-        
+
         <div className="mb-4">
           <input
             ref={pinInputRef}
@@ -556,9 +558,8 @@ const App: React.FC = () => {
               setPinError(false);
             }}
             onKeyPress={handlePinKeyPress}
-            className={`w-full px-4 py-3 text-2xl text-center border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono tracking-widest ${
-              pinError ? 'border-red-500 bg-red-50' : 'border-gray-300'
-            }`}
+            className={`w-full px-4 py-3 text-2xl text-center border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono tracking-widest ${pinError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+              }`}
             placeholder="• • • •"
             maxLength={4}
             autoComplete="off"
@@ -569,7 +570,7 @@ const App: React.FC = () => {
               Nieprawidłowy PIN. Spróbuj ponownie.
             </p>
           )}
-          
+
           <div className="mt-4">
             <NumericKeyboard
               onNumberClick={handlePinNumberClick}
@@ -608,12 +609,12 @@ const App: React.FC = () => {
   const fillZerosModal = showFillZerosModal && userSession && (() => {
     const userGroup = groups.find(g => g.id === userSession.groupId);
     if (!userGroup) return null;
-    
+
     const groupProducts = products.filter(p => userGroup.materialGroups.includes(p.materialGroup));
-    const uncountedProducts = groupProducts.filter(p => 
+    const uncountedProducts = groupProducts.filter(p =>
       inventoryData[userSession.groupId]?.[userSession.personId]?.[p.id] === undefined
     );
-    
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
@@ -623,14 +624,14 @@ const App: React.FC = () => {
           <p className="text-sm text-gray-600 mb-4">
             Następujące produkty nie zostały jeszcze policzone. Czy chcesz automatycznie uzupełnić je zerami?
           </p>
-          
+
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
             <p className="text-sm text-yellow-800">
-              <strong>Uwaga:</strong> Wszystkie poniższe produkty zostaną zapisane z ilością <strong>0</strong>. 
+              <strong>Uwaga:</strong> Wszystkie poniższe produkty zostaną zapisane z ilością <strong>0</strong>.
               Będziesz mógł je później edytować w historii wpisów.
             </p>
           </div>
-          
+
           <div className="mb-6 max-h-60 overflow-y-auto border rounded-lg">
             <table className="w-full">
               <thead className="bg-gray-50 sticky top-0">
@@ -649,7 +650,7 @@ const App: React.FC = () => {
               </tbody>
             </table>
           </div>
-          
+
           <div className="flex gap-3">
             <button
               onClick={handleCancelFillZeros}
@@ -712,9 +713,9 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           {currentView === 'admin-groups' ? (
-            <AdminGroupManagement 
+            <AdminGroupManagement
               groups={groups}
               products={products}
               inventoryData={inventoryData}
@@ -746,6 +747,7 @@ const App: React.FC = () => {
             onBackToUser={handleBackToUser}
             onEditProduct={(product) => {
               setSelectedProduct(product);
+              setFromComparison(true); // NOWE
               setCurrentView('user');
             }}
           />
@@ -784,8 +786,8 @@ const App: React.FC = () => {
               </button>
             </div>
           </div>
-          
-{!isAdminMode && (
+
+          {!isAdminMode && (
             <>
               <div className="flex items-center justify-between mb-4">
                 <div className="text-sm text-gray-600">
@@ -795,9 +797,9 @@ const App: React.FC = () => {
                   {progress.total > 0 ? Math.round((progress.counted / progress.total) * 100) : 0}% ukończone
                 </div>
               </div>
-              
+
               <div className="w-full bg-gray-200 rounded-full h-3">
-                <div 
+                <div
                   className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300"
                   style={{ width: `${progress.total > 0 ? (progress.counted / progress.total) * 100 : 0}%` }}
                 ></div>
@@ -810,7 +812,7 @@ const App: React.FC = () => {
         {!isAdminMode && (
           <>
             {!selectedProduct ? (
-              <CounterSearchView 
+              <CounterSearchView
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
                 searchType={searchType}
@@ -826,7 +828,7 @@ const App: React.FC = () => {
                 onCompareResults={handleCompareResults}
               />
             ) : (
-              <CounterInputView 
+              <CounterInputView
                 selectedProduct={selectedProduct}
                 setSelectedProduct={setSelectedProduct}
                 inputValue={inputValue}
@@ -839,6 +841,12 @@ const App: React.FC = () => {
                 deleteHistoryEntry={deleteHistoryEntry}
                 quantityInputRef={quantityInputRef}
                 userSession={userSession}
+                fromComparison={fromComparison}
+                onBackToComparison={() => {
+                  setSelectedProduct(null);
+                  setFromComparison(false);
+                  setCurrentView('comparison');
+                }}
               />
             )}
           </>

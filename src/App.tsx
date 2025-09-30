@@ -40,7 +40,8 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : null;
   });
 
-const [currentView, setCurrentView] = useState<'user' | 'admin' | 'comparison' | 'admin-groups'>('user');
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
+  const [currentView, setCurrentView] = useState<'user' | 'admin' | 'comparison' | 'admin-groups'>('user');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [searchType, setSearchType] = useState<'sap' | 'name'>('sap');
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
@@ -139,6 +140,7 @@ const [currentView, setCurrentView] = useState<'user' | 'admin' | 'comparison' |
   const handleUserSelect = (session: UserSession): void => {
     setUserSession(session);
     setCurrentView('user');
+    setIsAdminMode(false);
   };
 
   const handleAdminAccess = (): void => {
@@ -149,10 +151,19 @@ const [currentView, setCurrentView] = useState<'user' | 'admin' | 'comparison' |
 
   const handlePinSubmit = (): void => {
     if (pinInput === ADMIN_PIN) {
+      setIsAdminMode(true);
       setCurrentView('admin');
       setShowPinModal(false);
       setPinInput('');
       setPinError(false);
+      // Utwórz tymczasową sesję administratora jeśli nie ma userSession
+      if (!userSession) {
+        setUserSession({
+          groupId: groups[0]?.id || 'group1',
+          personId: 'person1',
+          personName: 'Administrator'
+        });
+      }
     } else {
       setPinError(true);
       setPinInput('');
@@ -436,6 +447,7 @@ const [currentView, setCurrentView] = useState<'user' | 'admin' | 'comparison' |
     setSelectedProduct(null);
     setSearchTerm('');
     setInputValue('');
+    setIsAdminMode(false);
     localStorage.removeItem('inventory-user-session');
   };
 
@@ -462,9 +474,89 @@ const [currentView, setCurrentView] = useState<'user' | 'admin' | 'comparison' |
     return { counted: countedProducts, total: groupProducts.length };
   };
 
+  // PIN Modal - renderuj zawsze, niezależnie od userSession
+  const pinModal = showPinModal && (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-96 max-w-sm mx-4 shadow-xl">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+          Dostęp do panelu administratora
+        </h3>
+        <p className="text-sm text-gray-600 mb-6 text-center">
+          Wprowadź PIN aby uzyskać dostęp do panelu administratora
+        </p>
+        
+        <div className="mb-4">
+          <input
+            ref={pinInputRef}
+            type="text"
+            inputMode="none"
+            value={pinInput}
+            onChange={(e) => {
+              setPinInput(e.target.value);
+              setPinError(false);
+            }}
+            onKeyPress={handlePinKeyPress}
+            className={`w-full px-4 py-3 text-2xl text-center border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono tracking-widest ${
+              pinError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+            }`}
+            placeholder="• • • •"
+            maxLength={4}
+            autoComplete="off"
+            readOnly
+          />
+          {pinError && (
+            <p className="text-red-600 text-sm mt-2 text-center">
+              Nieprawidłowy PIN. Spróbuj ponownie.
+            </p>
+          )}
+          
+          <div className="mt-4">
+            <NumericKeyboard
+              onNumberClick={handlePinNumberClick}
+              onBackspace={handlePinBackspace}
+              onClear={handlePinClear}
+              disabled={pinInput.length >= 4}
+              size="large"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={closePinModal}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Anuluj
+          </button>
+          <button
+            onClick={handlePinSubmit}
+            disabled={pinInput.length !== 4}
+            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            Potwierdź
+          </button>
+        </div>
+
+        <p className="text-xs text-gray-500 mt-4 text-center">
+          Naciśnij Enter aby potwierdzić lub Escape aby anulować
+        </p>
+      </div>
+    </div>
+  );
+
   // Render logic
+  if (!userSession && !isAdminMode) {
+    return (
+      <>
+        <UserSelection groups={groups} onUserSelect={handleUserSelect} onAdminAccess={handleAdminAccess} />
+        {pinModal}
+      </>
+    );
+  }
+
+  // Upewnij się, że userSession istnieje dla pozostałych widoków
   if (!userSession) {
-    return <UserSelection groups={groups} onUserSelect={handleUserSelect} onAdminAccess={handleAdminAccess} />;
+    return null; // To nigdy nie powinno się zdarzyć, ale TypeScript tego wymaga
   }
 
   // Admin view
@@ -509,6 +601,7 @@ const [currentView, setCurrentView] = useState<'user' | 'admin' | 'comparison' |
             </div>
           )}
         </div>
+        {pinModal}
       </div>
     );
   }
@@ -528,6 +621,7 @@ const [currentView, setCurrentView] = useState<'user' | 'admin' | 'comparison' |
             onBackToUser={handleBackToUser}
           />
         </div>
+        {pinModal}
       </div>
     );
   }
@@ -561,126 +655,66 @@ const [currentView, setCurrentView] = useState<'user' | 'admin' | 'comparison' |
             </div>
           </div>
           
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-sm text-gray-600">
-              Twój postęp w grupie: <span className="font-bold text-blue-600">{formatNumber(progress.counted)}/{formatNumber(progress.total)}</span>
-            </div>
-            <div className="text-sm text-gray-500">
-              {progress.total > 0 ? Math.round((progress.counted / progress.total) * 100) : 0}% ukończone
-            </div>
-          </div>
-          
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div 
-              className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300"
-              style={{ width: `${progress.total > 0 ? (progress.counted / progress.total) * 100 : 0}%` }}
-            ></div>
-          </div>
+          {!isAdminMode && (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm text-gray-600">
+                  Twój postęp w grupie: <span className="font-bold text-blue-600">{formatNumber(progress.counted)}/{formatNumber(progress.total)}</span>
+                </div>
+                <div className="text-sm text-gray-500">
+                  {progress.total > 0 ? Math.round((progress.counted / progress.total) * 100) : 0}% ukończone
+                </div>
+              </div>
+              
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${progress.total > 0 ? (progress.counted / progress.total) * 100 : 0}%` }}
+                ></div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Views */}
-        {!selectedProduct ? (
-          <CounterSearchView 
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            searchType={searchType}
-            setSearchType={setSearchType}
-            filteredProducts={filteredProducts}
-            inventoryData={inventoryData}
-            inventoryHistory={inventoryHistory}
-            getProductStatus={getProductStatus}
-            handleProductSelect={handleProductSelect}
-            handleKeyPress={handleKeyPress}
-            searchInputRef={searchInputRef}
-            userSession={userSession}
-            onCompareResults={handleCompareResults}
-          />
-        ) : (
-          <CounterInputView 
-            selectedProduct={selectedProduct}
-            setSelectedProduct={setSelectedProduct}
-            inputValue={inputValue}
-            setInputValue={setInputValue}
-            inventoryData={inventoryData}
-            inventoryHistory={inventoryHistory}
-            handleQuantitySubmit={handleQuantitySubmit}
-            handleKeyPress={handleKeyPress}
-            updateHistoryEntry={updateHistoryEntry}
-            deleteHistoryEntry={deleteHistoryEntry}
-            quantityInputRef={quantityInputRef}
-            userSession={userSession}
-          />
+        {!isAdminMode && (
+          <>
+            {!selectedProduct ? (
+              <CounterSearchView 
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                searchType={searchType}
+                setSearchType={setSearchType}
+                filteredProducts={filteredProducts}
+                inventoryData={inventoryData}
+                inventoryHistory={inventoryHistory}
+                getProductStatus={getProductStatus}
+                handleProductSelect={handleProductSelect}
+                handleKeyPress={handleKeyPress}
+                searchInputRef={searchInputRef}
+                userSession={userSession}
+                onCompareResults={handleCompareResults}
+              />
+            ) : (
+              <CounterInputView 
+                selectedProduct={selectedProduct}
+                setSelectedProduct={setSelectedProduct}
+                inputValue={inputValue}
+                setInputValue={setInputValue}
+                inventoryData={inventoryData}
+                inventoryHistory={inventoryHistory}
+                handleQuantitySubmit={handleQuantitySubmit}
+                handleKeyPress={handleKeyPress}
+                updateHistoryEntry={updateHistoryEntry}
+                deleteHistoryEntry={deleteHistoryEntry}
+                quantityInputRef={quantityInputRef}
+                userSession={userSession}
+              />
+            )}
+          </>
         )}
 
-        {/* PIN Modal */}
-        {showPinModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-96 max-w-sm mx-4 shadow-xl">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-                Dostęp do panelu administratora
-              </h3>
-              <p className="text-sm text-gray-600 mb-6 text-center">
-                Wprowadź PIN aby uzyskać dostęp do panelu administratora
-              </p>
-              
-              <div className="mb-4">
-                <input
-                  ref={pinInputRef}
-                  type="text"
-                  inputMode="none"
-                  value={pinInput}
-                  onChange={(e) => {
-                    setPinInput(e.target.value);
-                    setPinError(false);
-                  }}
-                  onKeyPress={handlePinKeyPress}
-                  className={`w-full px-4 py-3 text-2xl text-center border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono tracking-widest ${
-                    pinError ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}
-                  placeholder="• • • •"
-                  maxLength={4}
-                  autoComplete="off"
-                  readOnly
-                />
-                {pinError && (
-                  <p className="text-red-600 text-sm mt-2 text-center">
-                    Nieprawidłowy PIN. Spróbuj ponownie.
-                  </p>
-                )}
-                
-                <div className="mt-4">
-                  <NumericKeyboard
-                    onNumberClick={handlePinNumberClick}
-                    onBackspace={handlePinBackspace}
-                    onClear={handlePinClear}
-                    disabled={pinInput.length >= 4}
-                    size="large"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={closePinModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Anuluj
-                </button>
-                <button
-                  onClick={handlePinSubmit}
-                  disabled={pinInput.length !== 4}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                >
-                  Potwierdź
-                </button>
-              </div>
-
-              <p className="text-xs text-gray-500 mt-4 text-center">
-                Naciśnij Enter aby potwierdzić lub Escape aby anulować
-              </p>
-            </div>
-          </div>
-        )}
+        {pinModal}
       </div>
     </div>
   );

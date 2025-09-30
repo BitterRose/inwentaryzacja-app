@@ -23,30 +23,30 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
   const group = groups.find(g => g.id === userSession.groupId);
   if (!group) return null;
 
-  const groupProducts = products.filter(p =>
+  const groupProducts = products.filter(p => 
     group.materialGroups.includes(p.materialGroup)
   );
 
   const getProductComparison = (productId: number) => {
     const person1Data = inventoryData[userSession.groupId]?.person1?.[productId];
     const person2Data = inventoryData[userSession.groupId]?.person2?.[productId];
-
+    
     return { person1Data, person2Data };
   };
 
   // Sprawdź czy druga osoba ukończyła liczenie
   const otherPersonId = userSession.personId === 'person1' ? 'person2' : 'person1';
-  const otherPersonFinished = groupProducts.every(product =>
+  const otherPersonFinished = groupProducts.every(product => 
     inventoryData[userSession.groupId]?.[otherPersonId]?.[product.id] !== undefined
   );
 
   // Jeśli druga osoba nie skończyła - pokaż ekran oczekiwania
   if (!otherPersonFinished) {
     const otherPersonName = userSession.personId === 'person1' ? group.person2 : group.person1;
-    const otherPersonProgress = groupProducts.filter(product =>
+    const otherPersonProgress = groupProducts.filter(product => 
       inventoryData[userSession.groupId]?.[otherPersonId]?.[product.id] !== undefined
     ).length;
-
+    
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
@@ -70,28 +70,28 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
               <GitCompare className="w-16 h-16 text-blue-600" />
             </div>
           </div>
-
+          
           <h3 className="text-2xl font-bold text-gray-900 mb-4">
             Oczekiwanie na drugą osobę
           </h3>
-
+          
           <p className="text-lg text-gray-600 mb-6">
             <strong>{otherPersonName}</strong> nadal liczy produkty
           </p>
-
+          
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 max-w-md mx-auto">
             <div className="text-sm text-gray-600 mb-2">Postęp:</div>
             <div className="text-3xl font-bold text-blue-600 mb-2">
               {otherPersonProgress} / {groupProducts.length}
             </div>
             <div className="w-full bg-gray-200 rounded-full h-4">
-              <div
+              <div 
                 className="bg-blue-600 h-4 rounded-full transition-all duration-300"
                 style={{ width: `${(otherPersonProgress / groupProducts.length) * 100}%` }}
               ></div>
             </div>
           </div>
-
+          
           <p className="text-sm text-gray-500">
             Strona odświeży się automatycznie gdy <strong>{otherPersonName}</strong> ukończy liczenie
           </p>
@@ -131,7 +131,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
             Powrót do liczenia
           </button>
         </div>
-
+        
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-red-50 p-4 rounded-lg border border-red-200">
             <h3 className="font-semibold text-red-700 mb-2">Różnice</h3>
@@ -147,7 +147,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
 
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-yellow-800">
-            <strong>Instrukcja:</strong> Jeśli zauważysz różnicę, kliknij "Edytuj" przy produkcie,
+            <strong>Instrukcja:</strong> Jeśli zauważysz różnicę, kliknij "Edytuj" przy produkcie, 
             aby przejść do ekranu edycji i zweryfikować swoje wpisy w historii.
           </p>
         </div>
@@ -162,7 +162,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
           <div className="space-y-4">
             {discrepancies.map(product => {
               const { person1Data, person2Data } = getProductComparison(product.id);
-
+              
               return (
                 <div key={product.id} className="border border-red-300 rounded-lg p-4 bg-red-50">
                   <div className="flex items-center justify-between mb-3">
@@ -177,7 +177,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
                       Edytuj
                     </button>
                   </div>
-
+                  
                   <div className="grid grid-cols-2 gap-4">
                     <div className={`p-3 rounded border ${userSession.personId === 'person1' ? 'bg-white border-green-400 border-2' : 'bg-white'}`}>
                       <div className="text-sm text-gray-600">{group.person1}</div>
@@ -208,93 +208,90 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
             const { person1Data } = getProductComparison(product.id);
             return (person1Data || 0) === product.expectedQty;
           }).length > 0 && (
-              <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-green-400">
-                <h3 className="text-lg font-bold text-green-700 mb-4 flex items-center gap-2">
-                  <span className="text-2xl">✓</span>
-                  Zgodne wyniki - Zgadza się z systemem
-                </h3>
-                <div className="grid gap-3">
-                  {agreements.filter(product => {
-                    const { person1Data } = getProductComparison(product.id);
-                    return (person1Data || 0) === product.expectedQty;
-                  }).map(product => {
-                    const { person1Data } = getProductComparison(product.id);
-                    const countedQty = person1Data || 0;
-                    const expectedQty = product.expectedQty;
-
-                    return (
-                      <div key={product.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-300 rounded-lg">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900">{product.name}</h4>
-                          <p className="text-sm text-gray-600">SAP: {product.sapCode}</p>
+            <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-green-400">
+              <h3 className="text-lg font-bold text-green-700 mb-4 flex items-center gap-2">
+                <span className="text-2xl">✓</span>
+                Zgodne wyniki - Zgadza się z systemem
+              </h3>
+              <div className="grid gap-3">
+                {agreements.filter(product => {
+                  const { person1Data } = getProductComparison(product.id);
+                  return (person1Data || 0) === product.expectedQty;
+                }).map(product => {
+                  const { person1Data } = getProductComparison(product.id);
+                  const countedQty = person1Data || 0;
+                  
+                  return (
+                    <div key={product.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-300 rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">{product.name}</h4>
+                        <p className="text-sm text-gray-600">SAP: {product.sapCode}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="bg-white px-4 py-3 rounded-lg border-2 border-green-300 shadow-sm">
+                          <div className="text-xs text-gray-500 mb-1">Zliczone</div>
+                          <div className="text-xl font-bold text-green-600">{formatNumber(countedQty)}</div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className="bg-white px-4 py-3 rounded-lg border-2 border-green-300 shadow-sm">
-                            <div className="text-xs text-gray-500 mb-1">Zliczone</div>
-                            <div className="text-xl font-bold text-green-600">{formatNumber(countedQty)}</div>
-                          </div>
-                          <div className="text-xl text-green-600 font-bold">=</div>
-                          <div className="bg-white px-4 py-3 rounded-lg border-2 border-green-300 shadow-sm">
-                            <div className="text-xs text-gray-500 mb-1">System</div>
-                            <div className="text-xl font-bold text-green-600">{formatNumber(expectedQty)}</div>
-                          </div>
-                          <div className="px-4 py-3 rounded-lg font-bold bg-green-500 text-white shadow-sm">
-                            ✓ OK
-                          </div>
+                        <div className="px-4 py-3 rounded-lg font-bold bg-green-500 text-white shadow-sm">
+                          ✓ OK
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
+          )}
 
           {/* Produkty niezgodne z systemem */}
           {agreements.filter(product => {
             const { person1Data } = getProductComparison(product.id);
             return (person1Data || 0) !== product.expectedQty;
           }).length > 0 && (
-              <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-orange-400">
-                <h3 className="text-lg font-bold text-orange-700 mb-4 flex items-center gap-2">
-                  <span className="text-2xl">⚠</span>
-                  Zgodne wyniki - Różni się od systemu
-                </h3>
-                <div className="grid gap-3">
-                  {agreements.filter(product => {
-                    const { person1Data } = getProductComparison(product.id);
-                    return (person1Data || 0) !== product.expectedQty;
-                  }).map(product => {
-                    const { person1Data } = getProductComparison(product.id);
-                    const countedQty = person1Data || 0;
-                    const expectedQty = product.expectedQty;
-                    const difference = countedQty - expectedQty;
-
-                    return (
-                      <div key={product.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-orange-100 border-2 border-orange-300 rounded-lg">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900">{product.name}</h4>
-                          <p className="text-sm text-gray-600">SAP: {product.sapCode}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="bg-white px-4 py-3 rounded-lg border-2 border-orange-300 shadow-sm">
-                            <div className="text-xs text-gray-500 mb-1">Zliczone</div>
-                            <div className="text-xl font-bold text-orange-600">{formatNumber(countedQty)}</div>
-                          </div>
-                          <div className="text-xl text-orange-600 font-bold">≠</div>
-                          <div className="bg-white px-4 py-3 rounded-lg border-2 border-orange-300 shadow-sm">
-                            <div className="text-xs text-gray-500 mb-1">System</div>
-                            <div className="text-xl font-bold text-blue-600">{formatNumber(expectedQty)}</div>
-                          </div>
-                          <div className="px-4 py-3 rounded-lg font-bold bg-orange-500 text-white shadow-sm">
-                            {difference > 0 ? '+' : ''}{formatNumber(difference)}
-                          </div>
-                        </div>
+            <div className="bg-white rounded-lg shadow-lg p-6 border-2 border-orange-400">
+              <h3 className="text-lg font-bold text-orange-700 mb-4 flex items-center gap-2">
+                <span className="text-2xl">⚠</span>
+                Zgodne wyniki - Różni się od systemu
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Obie osoby naliczyły tę samą ilość, ale różni się ona od stanu systemowego. 
+                Kliknij "Edytuj" aby sprawdzić swoje wpisy.
+              </p>
+              <div className="grid gap-3">
+                {agreements.filter(product => {
+                  const { person1Data } = getProductComparison(product.id);
+                  return (person1Data || 0) !== product.expectedQty;
+                }).map(product => {
+                  const { person1Data } = getProductComparison(product.id);
+                  const countedQty = person1Data || 0;
+                  
+                  return (
+                    <div key={product.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-orange-100 border-2 border-orange-300 rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">{product.name}</h4>
+                        <p className="text-sm text-gray-600">SAP: {product.sapCode}</p>
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="flex items-center gap-3">
+                        <div className="bg-white px-4 py-3 rounded-lg border-2 border-orange-300 shadow-sm">
+                          <div className="text-xs text-gray-500 mb-1">Zliczone</div>
+                          <div className="text-xl font-bold text-orange-600">{formatNumber(countedQty)}</div>
+                        </div>
+                        <div className="px-4 py-3 rounded-lg font-bold bg-orange-500 text-white shadow-sm">
+                          ⚠ Różnica
+                        </div>
+                        <button
+                          onClick={() => onEditProduct(product)}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold"
+                        >
+                          Edytuj
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
+          )}
         </div>
       )}
     </div>

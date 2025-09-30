@@ -58,7 +58,7 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : {};
   });
   
-  const [comparisonData, setComparisonData] = useState<ComparisonData>(() => {
+  const [comparisonData] = useState<ComparisonData>(() => {
     const saved = localStorage.getItem('inventory-comparison');
     return saved ? JSON.parse(saved) : {};
   });
@@ -66,6 +66,7 @@ const App: React.FC = () => {
   const [showPinModal, setShowPinModal] = useState<boolean>(false);
   const [pinInput, setPinInput] = useState<string>('');
   const [pinError, setPinError] = useState<boolean>(false);
+  const [showFillZerosModal, setShowFillZerosModal] = useState<boolean>(false);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -382,7 +383,7 @@ const App: React.FC = () => {
     });
   };
 
-const getProductStatus = (product: Product): ProductStatus => {
+  const getProductStatus = (product: Product): ProductStatus => {
     if (!userSession) return 'pending';
     
     const currentUserData = inventoryData[userSession.groupId]?.[userSession.personId]?.[product.id];
@@ -418,21 +419,6 @@ const getProductStatus = (product: Product): ProductStatus => {
     return 'counted';
   };
 
-  const handleResolveDiscrepancy = (productId: number, finalQuantity: number): void => {
-    if (!userSession) return;
-    
-    setComparisonData(prev => ({
-      ...prev,
-      [userSession.groupId]: {
-        ...prev[userSession.groupId],
-        [productId]: {
-          resolved: true,
-          finalQuantity
-        }
-      }
-    }));
-  };
-
   const handlePinNumberClick = (num: string): void => {
     if (pinInput.length < 4) {
       setPinInput(pinInput + num);
@@ -457,15 +443,80 @@ const getProductStatus = (product: Product): ProductStatus => {
     setSearchTerm('');
     setInputValue('');
     setIsAdminMode(false);
+    setShowFillZerosModal(false);
     localStorage.removeItem('inventory-user-session');
   };
 
   const handleBackToUser = (): void => {
     setCurrentView('user');
+    setSelectedProduct(null);
+  };
+
+  const handleFillZeros = (): void => {
+    if (!userSession) return;
+    
+    const userGroup = groups.find(g => g.id === userSession.groupId);
+    if (!userGroup) return;
+    
+    const groupProducts = products.filter(p => userGroup.materialGroups.includes(p.materialGroup));
+    const uncountedProducts = groupProducts.filter(p => 
+      inventoryData[userSession.groupId]?.[userSession.personId]?.[p.id] === undefined
+    );
+    
+    const timestamp = Date.now();
+    
+    // Wypełnij wszystkie nieuzupełnione produkty zerami
+    const newInventoryData = { ...inventoryData };
+    const newInventoryHistory = { ...inventoryHistory };
+    
+    if (!newInventoryData[userSession.groupId]) {
+      newInventoryData[userSession.groupId] = {};
+    }
+    if (!newInventoryData[userSession.groupId][userSession.personId]) {
+      newInventoryData[userSession.groupId][userSession.personId] = {};
+    }
+    if (!newInventoryHistory[userSession.groupId]) {
+      newInventoryHistory[userSession.groupId] = {};
+    }
+    if (!newInventoryHistory[userSession.groupId][userSession.personId]) {
+      newInventoryHistory[userSession.groupId][userSession.personId] = {};
+    }
+    
+    uncountedProducts.forEach(product => {
+      newInventoryData[userSession.groupId][userSession.personId][product.id] = 0;
+      newInventoryHistory[userSession.groupId][userSession.personId][product.id] = [
+        { id: timestamp, quantity: 0, timestamp, location: 'Auto-uzupełnienie' }
+      ];
+    });
+    
+    setInventoryData(newInventoryData);
+    setInventoryHistory(newInventoryHistory);
+    setShowFillZerosModal(false);
+    setCurrentView('comparison');
+  };
+
+  const handleCancelFillZeros = (): void => {
+    setShowFillZerosModal(false);
   };
 
   const handleCompareResults = (): void => {
-    setCurrentView('comparison');
+    if (!userSession) return;
+    
+    const userGroup = groups.find(g => g.id === userSession.groupId);
+    if (!userGroup) return;
+    
+    const groupProducts = products.filter(p => userGroup.materialGroups.includes(p.materialGroup));
+    
+    // Sprawdź które produkty nie zostały policzone przez bieżącego użytkownika
+    const uncountedProducts = groupProducts.filter(p => 
+      inventoryData[userSession.groupId]?.[userSession.personId]?.[p.id] === undefined
+    );
+    
+    if (uncountedProducts.length > 0) {
+      setShowFillZerosModal(true);
+    } else {
+      setCurrentView('comparison');
+    }
   };
 
   // Calculate progress for current user's group
@@ -553,12 +604,78 @@ const getProductStatus = (product: Product): ProductStatus => {
     </div>
   );
 
+  // Fill Zeros Modal
+  const fillZerosModal = showFillZerosModal && userSession && (() => {
+    const userGroup = groups.find(g => g.id === userSession.groupId);
+    if (!userGroup) return null;
+    
+    const groupProducts = products.filter(p => userGroup.materialGroups.includes(p.materialGroup));
+    const uncountedProducts = groupProducts.filter(p => 
+      inventoryData[userSession.groupId]?.[userSession.personId]?.[p.id] === undefined
+    );
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 shadow-xl max-h-[90vh] overflow-y-auto">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">
+            ⚠️ Nieuzupełnione produkty
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Następujące produkty nie zostały jeszcze policzone. Czy chcesz automatycznie uzupełnić je zerami?
+          </p>
+          
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-yellow-800">
+              <strong>Uwaga:</strong> Wszystkie poniższe produkty zostaną zapisane z ilością <strong>0</strong>. 
+              Będziesz mógł je później edytować w historii wpisów.
+            </p>
+          </div>
+          
+          <div className="mb-6 max-h-60 overflow-y-auto border rounded-lg">
+            <table className="w-full">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Kod SAP</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700">Nazwa produktu</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {uncountedProducts.map(product => (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 text-sm font-mono">{product.sapCode}</td>
+                    <td className="px-4 py-2 text-sm">{product.name}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          <div className="flex gap-3">
+            <button
+              onClick={handleCancelFillZeros}
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-semibold"
+            >
+              Anuluj
+            </button>
+            <button
+              onClick={handleFillZeros}
+              className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+            >
+              Uzupełnij zerami ({uncountedProducts.length})
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  })();
+
   // Render logic
   if (!userSession && !isAdminMode) {
     return (
       <>
         <UserSelection groups={groups} onUserSelect={handleUserSelect} onAdminAccess={handleAdminAccess} />
         {pinModal}
+        {fillZerosModal}
       </>
     );
   }
@@ -611,6 +728,7 @@ const getProductStatus = (product: Product): ProductStatus => {
           )}
         </div>
         {pinModal}
+        {fillZerosModal}
       </div>
     );
   }
@@ -623,14 +741,17 @@ const getProductStatus = (product: Product): ProductStatus => {
           <ComparisonView
             products={products}
             inventoryData={inventoryData}
-            comparisonData={comparisonData}
             userSession={userSession}
             groups={groups}
-            onResolveDiscrepancy={handleResolveDiscrepancy}
             onBackToUser={handleBackToUser}
+            onEditProduct={(product) => {
+              setSelectedProduct(product);
+              setCurrentView('user');
+            }}
           />
         </div>
         {pinModal}
+        {fillZerosModal}
       </div>
     );
   }
@@ -664,7 +785,7 @@ const getProductStatus = (product: Product): ProductStatus => {
             </div>
           </div>
           
-          {!isAdminMode && (
+{!isAdminMode && (
             <>
               <div className="flex items-center justify-between mb-4">
                 <div className="text-sm text-gray-600">
@@ -724,6 +845,7 @@ const getProductStatus = (product: Product): ProductStatus => {
         )}
 
         {pinModal}
+        {fillZerosModal}
       </div>
     </div>
   );

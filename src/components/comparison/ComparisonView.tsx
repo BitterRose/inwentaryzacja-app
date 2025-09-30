@@ -1,25 +1,24 @@
 import React from 'react';
 import { GitCompare } from 'lucide-react';
-import type { Product, InventoryData, ComparisonData, UserSession, CountingGroup } from '../../types';
+import type { Product, InventoryData, UserSession, CountingGroup } from '../../types';
 import { formatNumber } from '../../utils/helpers';
 
 interface ComparisonViewProps {
   products: Product[];
   inventoryData: InventoryData;
-  comparisonData: ComparisonData;
   userSession: UserSession;
   groups: CountingGroup[];
-  onResolveDiscrepancy: (productId: number, finalQuantity: number) => void;
   onBackToUser: () => void;
+  onEditProduct: (product: Product) => void;
 }
 
 export const ComparisonView: React.FC<ComparisonViewProps> = ({
   products,
   inventoryData,
-  comparisonData,
   userSession,
   groups,
-  onBackToUser
+  onBackToUser,
+  onEditProduct
 }) => {
   const group = groups.find(g => g.id === userSession.groupId);
   if (!group) return null;
@@ -31,11 +30,75 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
   const getProductComparison = (productId: number) => {
     const person1Data = inventoryData[userSession.groupId]?.person1?.[productId];
     const person2Data = inventoryData[userSession.groupId]?.person2?.[productId];
-    const resolved = comparisonData[userSession.groupId]?.[productId]?.resolved || false;
-    const finalQuantity = comparisonData[userSession.groupId]?.[productId]?.finalQuantity;
     
-    return { person1Data, person2Data, resolved, finalQuantity };
+    return { person1Data, person2Data };
   };
+
+  // Sprawdź czy druga osoba ukończyła liczenie
+  const otherPersonId = userSession.personId === 'person1' ? 'person2' : 'person1';
+  const otherPersonFinished = groupProducts.every(product => 
+    inventoryData[userSession.groupId]?.[otherPersonId]?.[product.id] !== undefined
+  );
+
+  // Jeśli druga osoba nie skończyła - pokaż ekran oczekiwania
+  if (!otherPersonFinished) {
+    const otherPersonName = userSession.personId === 'person1' ? group.person2 : group.person1;
+    const otherPersonProgress = groupProducts.filter(product => 
+      inventoryData[userSession.groupId]?.[otherPersonId]?.[product.id] !== undefined
+    ).length;
+    
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <GitCompare className="text-blue-600" />
+              Porównanie wyników - {group.name}
+            </h2>
+            <button
+              onClick={onBackToUser}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Powrót do liczenia
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-lg p-12 border border-gray-200 text-center">
+          <div className="mb-6">
+            <div className="inline-block p-4 bg-blue-100 rounded-full mb-4">
+              <GitCompare className="w-16 h-16 text-blue-600" />
+            </div>
+          </div>
+          
+          <h3 className="text-2xl font-bold text-gray-900 mb-4">
+            Oczekiwanie na drugą osobę
+          </h3>
+          
+          <p className="text-lg text-gray-600 mb-6">
+            <strong>{otherPersonName}</strong> nadal liczy produkty
+          </p>
+          
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 max-w-md mx-auto">
+            <div className="text-sm text-gray-600 mb-2">Postęp:</div>
+            <div className="text-3xl font-bold text-blue-600 mb-2">
+              {otherPersonProgress} / {groupProducts.length}
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-4">
+              <div 
+                className="bg-blue-600 h-4 rounded-full transition-all duration-300"
+                style={{ width: `${(otherPersonProgress / groupProducts.length) * 100}%` }}
+              ></div>
+            </div>
+          </div>
+          
+          <p className="text-sm text-gray-500">
+            Strona odświeży się automatycznie gdy <strong>{otherPersonName}</strong> ukończy liczenie
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Tylko produkty gdzie obie osoby policzyły
   const comparedProducts = groupProducts.filter(product => {
@@ -44,23 +107,13 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
   });
 
   const discrepancies = comparedProducts.filter(product => {
-    const { person1Data, person2Data, resolved } = getProductComparison(product.id);
-    return person1Data !== person2Data && !resolved;
+    const { person1Data, person2Data } = getProductComparison(product.id);
+    return person1Data !== person2Data;
   });
 
   const agreements = comparedProducts.filter(product => {
-    const { person1Data, person2Data, resolved } = getProductComparison(product.id);
-    return person1Data === person2Data && !resolved;
-  });
-
-  const resolvedDiscrepancies = comparedProducts.filter(product => {
-    const { resolved } = getProductComparison(product.id);
-    return resolved;
-  });
-
-  const notYetCounted = groupProducts.filter(product => {
     const { person1Data, person2Data } = getProductComparison(product.id);
-    return person1Data === undefined || person2Data === undefined;
+    return person1Data === person2Data;
   });
 
   return (
@@ -79,81 +132,32 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
           </button>
         </div>
         
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-red-50 p-4 rounded-lg border border-red-200">
             <h3 className="font-semibold text-red-700 mb-2">Różnice</h3>
             <div className="text-2xl font-bold text-red-600">{discrepancies.length}</div>
-            <div className="text-xs text-gray-600 mt-1">wymaga rozwiązania</div>
+            <div className="text-xs text-gray-600 mt-1">wymaga weryfikacji</div>
           </div>
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
             <h3 className="font-semibold text-green-700 mb-2">Zgodne</h3>
             <div className="text-2xl font-bold text-green-600">{agreements.length}</div>
             <div className="text-xs text-gray-600 mt-1">identyczne wyniki</div>
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h3 className="font-semibold text-blue-700 mb-2">Rozwiązane</h3>
-            <div className="text-2xl font-bold text-blue-600">{resolvedDiscrepancies.length}</div>
-            <div className="text-xs text-gray-600 mt-1">po korekcie</div>
-          </div>
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h3 className="font-semibold text-gray-700 mb-2">Brak danych</h3>
-            <div className="text-2xl font-bold text-gray-600">{notYetCounted.length}</div>
-            <div className="text-xs text-gray-600 mt-1">nie policzone przez obie osoby</div>
-          </div>
         </div>
 
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-yellow-800">
-            <strong>Instrukcja:</strong> Jeśli zauważysz różnicę w swoich wynikach z drugim liczącym, 
-            wróć do ekranu liczenia i zweryfikuj swoje wpisy w historii. Każda osoba edytuje tylko swoje dane.
+            <strong>Instrukcja:</strong> Jeśli zauważysz różnicę, kliknij "Edytuj" przy produkcie, 
+            aby przejść do ekranu edycji i zweryfikować swoje wpisy w historii.
           </p>
         </div>
       </div>
-
-      {notYetCounted.length > 0 && (
-        <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
-          <h3 className="text-lg font-bold text-gray-700 mb-4">
-            ⏳ Oczekiwanie na dane ({notYetCounted.length})
-          </h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Następujące produkty nie zostały jeszcze policzone przez obie osoby:
-          </p>
-          <div className="grid gap-3">
-            {notYetCounted.map(product => {
-              const { person1Data, person2Data } = getProductComparison(product.id);
-              
-              return (
-                <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-300 rounded-lg">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">{product.name}</h4>
-                    <p className="text-sm text-gray-600">SAP: {product.sapCode}</p>
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="text-center">
-                      <div className="text-xs text-gray-500">{group.person1}</div>
-                      <div className={`font-bold ${person1Data !== undefined ? 'text-green-600' : 'text-gray-400'}`}>
-                        {person1Data !== undefined ? formatNumber(person1Data) : '—'}
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xs text-gray-500">{group.person2}</div>
-                      <div className={`font-bold ${person2Data !== undefined ? 'text-purple-600' : 'text-gray-400'}`}>
-                        {person2Data !== undefined ? formatNumber(person2Data) : '—'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {discrepancies.length > 0 && (
         <div className="bg-white rounded-lg shadow-lg p-6 border border-red-200">
           <h3 className="text-lg font-bold text-red-700 mb-4">⚠️ Różnice wymagające weryfikacji</h3>
           <p className="text-sm text-gray-600 mb-4">
-            Wróć do ekranu liczenia i sprawdź swoje wpisy w historii. Każda osoba weryfikuje i edytuje tylko swoje dane.
+            Kliknij "Edytuj" aby przejść do ekranu danego produktu i sprawdzić swoje wpisy.
           </p>
           <div className="space-y-4">
             {discrepancies.map(product => {
@@ -161,11 +165,17 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
               
               return (
                 <div key={product.id} className="border border-red-300 rounded-lg p-4 bg-red-50">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <div>
                       <h4 className="font-semibold text-gray-900">{product.name}</h4>
                       <p className="text-sm text-gray-600">SAP: {product.sapCode}</p>
                     </div>
+                    <button
+                      onClick={() => onEditProduct(product)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold"
+                    >
+                      Edytuj
+                    </button>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
@@ -207,30 +217,6 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
                   <div className="bg-white px-3 py-2 rounded border border-green-300">
                     <div className="text-lg font-bold text-green-600">{formatNumber(person1Data || 0)}</div>
                     <div className="text-xs text-gray-500">zgodnie</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {resolvedDiscrepancies.length > 0 && (
-        <div className="bg-white rounded-lg shadow-lg p-6 border border-blue-200">
-          <h3 className="text-lg font-bold text-blue-700 mb-4">✓ Rozwiązane różnice</h3>
-          <div className="grid gap-3">
-            {resolvedDiscrepancies.map(product => {
-              const { finalQuantity } = getProductComparison(product.id);
-              
-              return (
-                <div key={product.id} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-300 rounded-lg">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">{product.name}</h4>
-                    <p className="text-sm text-gray-600">SAP: {product.sapCode}</p>
-                  </div>
-                  <div className="bg-white px-3 py-2 rounded border border-blue-300">
-                    <div className="text-lg font-bold text-blue-600">{formatNumber(finalQuantity || 0)}</div>
-                    <div className="text-xs text-gray-500">po weryfikacji</div>
                   </div>
                 </div>
               );
